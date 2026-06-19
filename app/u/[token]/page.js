@@ -143,7 +143,7 @@ function MonthlyTable({ monthly }) {
         </thead>
         <tbody>
           {[...monthly].reverse().map((m, i) => (
-            <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+            <tr key={m.month} className="border-b border-gray-800/50 hover:bg-gray-800/30">
               <td className="py-1.5 text-gray-400">{fmtMonth(m.month)}</td>
               <td className={`py-1.5 text-right font-mono font-bold ${clr(m.gross_pnl)}`}>
                 {rs(m.gross_pnl)}
@@ -192,7 +192,7 @@ function RecentTradesTable({ trades }) {
         </thead>
         <tbody>
           {trades.map((t, i) => (
-            <tr key={i} className="border-b border-gray-800/40 hover:bg-gray-800/20">
+            <tr key={`${t.trade_date}-${t.index_name}-${t.direction || i}`} className="border-b border-gray-800/40 hover:bg-gray-800/20">
               <td className="py-1.5 text-gray-400">{t.trade_date}</td>
               <td
                 className="py-1.5 text-right font-semibold"
@@ -231,30 +231,29 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(null)
+  const [lastError, setLastError] = useState(null)
   const [showDetails, setShowDetails] = useState(false)
 
   const fetchData = useCallback(async () => {
     if (!token) return
     try {
       const res = await fetch(`/api/u/${token}`, { cache: 'no-store' })
-      if (res.status === 404) {
-        setNotFound(true)
-        return
-      }
-      const json = await res.json()
-      if (json.error === 'Not found') {
-        setNotFound(true)
-        return
-      }
+      if (res.status === 404) { setNotFound(true); return }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
       setData(json)
-      setError(null)
+      setLastError(null)
     } catch (e) {
-      setError(e.message)
+      if (data) {
+        // Already have data — show inline warning, don't replace dashboard
+        setLastError(e.message)
+      } else {
+        setError(e.message) // no data yet — show full error page
+      }
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, data])
 
   useEffect(() => {
     fetchData()
@@ -287,6 +286,11 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4 max-w-lg mx-auto">
+      {lastError && (
+        <div className="mb-4 rounded-lg bg-yellow-900/40 border border-yellow-700 text-yellow-300 text-sm px-4 py-2">
+          ⚠ Last refresh failed — showing data from previous fetch. ({lastError})
+        </div>
+      )}
       {/* Header */}
       <div className="mb-5 pb-4 border-b border-gray-800">
         <div className="flex items-center justify-between">

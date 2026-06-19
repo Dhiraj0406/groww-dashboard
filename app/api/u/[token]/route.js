@@ -43,10 +43,9 @@ export async function GET(request, { params }) {
     .eq('user_name', user_name)
     .order('month', { ascending: true })
 
-  // 4. Fetch capital snapshot (try user-scoped, fall back to latest overall)
+  // 4. Fetch capital snapshot (user-scoped only — no cross-user fallback)
   let capitalRow = null
   {
-    // Try filtering by user_name first
     const { data: capUser } = await supabase
       .from('capital_snapshots')
       .select('*')
@@ -56,37 +55,33 @@ export async function GET(request, { params }) {
 
     if (capUser && capUser.length > 0) {
       capitalRow = capUser[0]
-    } else {
-      // Fall back to latest overall snapshot
-      const { data: capAny } = await supabase
-        .from('capital_snapshots')
-        .select('*')
-        .order('snapshot_date', { ascending: false })
-        .limit(1)
-      capitalRow = capAny?.[0] ?? null
     }
   }
 
   // 5. Compute KPIs
-  const today = new Date(
-    new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
-  ).toISOString().split('T')[0]
-  const curMon = today.slice(0, 7)
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) // "2026-06-19"
+  const curMon = today.slice(0, 7) // "2026-06"
 
   const total_pnl = trades.reduce((s, t) => s + (t.pnl || 0), 0)
   const wins = trades.filter(t => t.outcome === 'TARGET').length
   const trade_count = trades.length
   const win_rate = trade_count > 0 ? Math.round((wins / trade_count) * 1000) / 10 : 0
 
-  const month_pnl = trades
-    .filter(t => t.trade_date?.startsWith(curMon))
-    .reduce((s, t) => s + (t.pnl || 0), 0)
+  // Find current month row in the monthly view data
+  const curMonthRow = (monthly || []).find(m => {
+    const mStr = new Date(m.month).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }).slice(0, 7)
+    return mStr === curMon
+  })
+  const month_pnl = Math.round(curMonthRow?.gross_pnl || 0)
 
-  const capital_current = capitalRow?.capital_current ?? null
   const capital_base = capitalRow?.capital_base ?? null
+  // No capital snapshot for this user — derive from trades
+  const capital_current = capitalRow != null
+    ? (capitalRow.capital_current ?? null)
+    : Math.round((capital_base ?? 0) + total_pnl)
 
   const user_share_total = Math.round(total_pnl * 0.5)
-  const user_share_month = Math.round(month_pnl * 0.5)
+  const user_share_month = Math.round(curMonthRow?.user_share ?? month_pnl * 0.5)
 
   // 6. Bot status
   let bot_status
@@ -102,7 +97,7 @@ export async function GET(request, { params }) {
   const monthlyOut = (monthly || []).map(m => ({
     month: m.month,
     gross_pnl: Math.round(m.gross_pnl || 0),
-    your_share: Math.round((m.user_share) || Math.round((m.gross_pnl || 0) * 0.5)),
+    your_share: Math.round(m.user_share ?? (m.gross_pnl || 0) * 0.5),
     trade_count: m.trade_count || 0,
     wins: m.wins || 0,
     losses: m.losses || 0,
