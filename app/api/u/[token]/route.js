@@ -74,11 +74,10 @@ export async function GET(request, { params }) {
   })
   const month_pnl = Math.round(curMonthRow?.gross_pnl || 0)
 
-  const capital_base = capitalRow?.capital_base ?? null
+  const capital_base = capitalRow?.capital_base ?? 0
   // No capital snapshot for this user — derive from trades
-  const capital_current = capitalRow != null
-    ? (capitalRow.capital_current ?? null)
-    : Math.round((capital_base ?? 0) + total_pnl)
+  const capital_current = capitalRow ? Math.round(capitalRow.capital_current) : Math.round(capital_base + total_pnl)
+  const peak_capital = capitalRow ? Math.round(capitalRow.peak_capital) : Math.round(capital_current)
 
   const user_share_total = Math.round(total_pnl * 0.5)
   const user_share_month = Math.round(curMonthRow?.user_share ?? month_pnl * 0.5)
@@ -116,8 +115,8 @@ export async function GET(request, { params }) {
       win_rate,
       trade_count,
       month_pnl: Math.round(month_pnl),
-      capital_current: capital_current != null ? Math.round(capital_current) : null,
-      capital_base: capital_base != null ? Math.round(capital_base) : null,
+      capital_current,
+      capital_base: capitalRow ? Math.round(capital_base) : null,
       user_share_total,
       user_share_month,
     },

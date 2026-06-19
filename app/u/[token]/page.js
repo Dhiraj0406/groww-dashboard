@@ -287,8 +287,10 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4 max-w-lg mx-auto">
       {lastError && (
-        <div className="mb-4 rounded-lg bg-yellow-900/40 border border-yellow-700 text-yellow-300 text-sm px-4 py-2">
-          ⚠ Last refresh failed — showing data from previous fetch. ({lastError})
+        <div className="mb-4 rounded-lg bg-yellow-900/40 border border-yellow-700 text-yellow-300 text-sm px-4 py-2 flex items-center gap-2">
+          <span>⚠</span>
+          <span>Last refresh failed — showing cached data. ({lastError})</span>
+          <button onClick={() => setLastError(null)} className="ml-auto text-yellow-500 hover:text-yellow-200">✕</button>
         </div>
       )}
       {/* Header */}
