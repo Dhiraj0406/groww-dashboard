@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
   // 1. Resolve token → member
   const { data: member, error: memberErr } = await supabase
     .from('members')
-    .select('user_name, token_status, is_live')
+    .select('name, token_status, is_live')
     .eq('dashboard_token', token)
     .single()
 
@@ -27,20 +27,20 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const { user_name, token_status, is_live } = member
+  const { name, token_status, is_live } = member
 
   // 2. Fetch trades for this user (ascending so equity curve is chronological)
   const { data: trades = [] } = await supabase
     .from('trades')
     .select('*')
-    .eq('user_name', user_name)
+    .eq('user_name', name)
     .order('trade_date', { ascending: true })
 
   // 3. Fetch monthly P&L view
   const { data: monthly = [] } = await supabase
     .from('user_monthly_pnl')
     .select('*')
-    .eq('user_name', user_name)
+    .eq('user_name', name)
     .order('month', { ascending: true })
 
   // 4. Fetch capital snapshot (user-scoped only — no cross-user fallback)
@@ -49,7 +49,7 @@ export async function GET(request, { params }) {
     const { data: capUser } = await supabase
       .from('capital_snapshots')
       .select('*')
-      .eq('user_name', user_name)
+      .eq('user_name', name)
       .order('snapshot_date', { ascending: false })
       .limit(1)
 
@@ -104,8 +104,8 @@ export async function GET(request, { params }) {
 
   return NextResponse.json({
     user: {
-      name: user_name,
-      display: capitalize(user_name),
+      name: name,
+      display: capitalize(name),
       token_status,
       is_live: is_live ?? false,
     },
